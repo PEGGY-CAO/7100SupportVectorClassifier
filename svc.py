@@ -113,13 +113,16 @@ trial1Fp2 = centeredVectors[0][0][16]
 
 numbers = np.array(trial1).shape[0]
 print numbers
+# numbers = 7680 in this case
 alpha = 12
 
 fft_vals = np.fft.fft(trial1)
 fft_theo = 2.0 * np.abs(fft_vals / numbers)
 fftTrial1Fp2 = 2.0 * np.abs(np.fft.fft(trial1Fp2) / numbers)
+f = 1.0 / 128
+freq = np.fft.fftfreq(numbers, f)
 
-freq = np.fft.fftfreq(numbers)
+print np.array(freq).shape
 mask = freq > 0
 plt.figure(2)
 plt.plot(freq[mask], fft_theo[mask], 'r', label="Fp1")
