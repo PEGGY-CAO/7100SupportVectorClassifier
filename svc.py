@@ -6,7 +6,9 @@ import numpy as np
 import operator
 import matplotlib.pyplot as plt
 from numpy.fft import fft, fftfreq, ifft
-
+import matplotlib.mlab as mlab
+import matplotlib.gridspec as gridspec
+from scipy import signal
 
 #first, read in the pre-processed data from a folder containing the DEAP .dat files.
 print("Loading EEG files")
@@ -96,6 +98,9 @@ for filename in filenames:
         #select six channels: Fp1, Fp2, O1, O2, T8, P4
         channelSelect = [0, 16, 13, 31, 25, 29]
         
+        # collect data in order to draw box-and-whisker plot
+        
+        
 #        for datum, label in centeredVectors:
 #            if random.uniform(0,1) < .2:
 #                x_test.append(np.array(operator.itemgetter(*b)(np.array(datum))).flatten())
@@ -110,6 +115,8 @@ for filename in filenames:
 # I want to plot FFT of the first participant's first trial of channel Fp1
 trial1 = centeredVectors[0][0][0]
 trial1Fp2 = centeredVectors[0][0][16]
+trial1O1 = centeredVectors[0][0][13]
+trial1O2 = centeredVectors[0][0][31]
 
 numbers = np.array(trial1).shape[0]
 print numbers
@@ -117,15 +124,20 @@ print numbers
 alpha = 12
 
 fft_vals = np.fft.fft(trial1)
-fft_theo = 2.0 * np.abs(fft_vals / numbers)
+fft_t1_fp1 = 2.0 * np.abs(fft_vals / numbers)
 fftTrial1Fp2 = 2.0 * np.abs(np.fft.fft(trial1Fp2) / numbers)
+
+
 f = 1.0 / 128
 freq = np.fft.fftfreq(numbers, f)
 
 print np.array(freq).shape
-mask = freq > 0
+# construct an Alpha mask
+mask = ((freq >= 8) & (freq <= 12))
+
+
 plt.figure(2)
-plt.plot(freq[mask], fft_theo[mask], 'r', label="Fp1")
+plt.plot(freq[mask], fft_t1_fp1[mask], 'r', label="Fp1")
 plt.plot(freq[mask], fftTrial1Fp2[mask], 'b', label="Fp2")
 plt.legend()
 plt.title("FFT for first trial of participant 1")
@@ -139,6 +151,42 @@ plt.plot(freq[mask], psFp1[mask], 'r', label="ps-Fp1")
 plt.plot(freq[mask], psFp2[mask], 'b', label="ps-Fp2")
 plt.legend()
 plt.title("power spectrum for Fp1 and Fp2")
+plt.show()
+
+fft_t1_o1 = 2.0 * np.abs(np.fft.fft(trial1O1) / numbers)
+fft_t1_o2 = 2.0 * np.abs(np.fft.fft(trial1O2) / numbers)
+plt.figure(4)
+plt.plot(freq[mask], fft_t1_o1[mask], 'r', label="fft-O1")
+plt.plot(freq[mask], fft_t1_o2[mask], 'b', label="fft-O2")
+plt.legend()
+plt.title("fft for O1 and O2")
+plt.show()
+
+ps_o1 = 2.0 * (np.abs(np.fft.fft(trial1O1) / numbers)**2.0)
+ps_o2 = 2.0 * (np.abs(np.fft.fft(trial1O2) / numbers)**2.0)
+plt.figure(5)
+plt.plot(freq[mask], ps_o1[mask], 'r', label="ps-o1")
+plt.plot(freq[mask], ps_o2[mask], 'b', label="ps-o2")
+plt.legend()
+plt.title("power spectrum for O1 and O2")
+plt.show()
+
+plt.figure(6)
+psd, freqs = plt.psd(trial1O1, Fs=128)
+#print psd, freqs
+plt.psd(trial1O2, Fs=128)
+plt.show()
+
+plt.figure(7)
+F1, PSD1 = signal.welch(trial1O1, fs=128)
+F2, PSD2 = signal.welch(trial1O2, fs=128)
+#print F1, F2
+#print PSD1
+alpha = ((F1 >= 8) & (F1 <= 12))
+plt.plot(F1[alpha], PSD1[alpha], 'r', label="psdO1")
+plt.plot(F1[alpha], PSD2[alpha], 'b', label="psdO2")
+plt.title("power spectral density for O1 and O2 with scipy welch")
+plt.legend()
 plt.show()
 
 #print trial1
