@@ -87,76 +87,89 @@ for filename in filenames:
         sad = []
         
         #select 8 matching channels: Fp1, Fp2, O1, O2, T7, T8, P3, P4
-        channelSelect = [0, 16, 13, 31, 7, 25, 10, 28]
-        # O1, O2, T7, T8
-#        channelSelect = [13, 31, 7, 25]
+        # channelSelect = [0, 16, 13, 31, 7, 25, 10, 28]
+        # Fp1, Fp2
+        channelSelect = [10, 28]
         
-        #normalize Valence from 1-9 to a binary scale 0-1
+        #select motions with happy and unhappy
         for trial in range(40):
-            if valences[trial] >= 6 and valences[trial] <= 9:
-                eightChannels = [centeredData[trial][i] for i in channelSelect]
+            chunk = 128 * 3
+            nums_chunk = 7680 / chunk
             
-                F1, PSDfp1 = signal.welch(eightChannels[0], fs=128)
-                F1, PSDfp2 = signal.welch(eightChannels[1], fs=128)
-                alpha = ((F1 >= 8) & (F1 <= 12))
-                if trial == 1:
-                    plt.figure(2)
-                    plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
-                    plt.show()
-                
-#                print np.array(PSD2[alpha]).shape
-                diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
-                F1, PSDO1 = signal.welch(eightChannels[2], fs=128)
-                F1, PSDO2 = signal.welch(eightChannels[3], fs=128)
-                diffO = np.dot(F1[alpha], PSDO1[alpha]) - np.dot(F1[alpha], PSDO2[alpha])
-                F1, PSDT7 = signal.welch(eightChannels[4], fs=128)
-                F1, PSDT8 = signal.welch(eightChannels[5], fs=128)
-                diffT = np.dot(F1[alpha], PSDT7[alpha]) - np.dot(F1[alpha], PSDT8[alpha])
-                F1, PSDP3 = signal.welch(eightChannels[6], fs=128)
-                F1, PSDP4 = signal.welch(eightChannels[7], fs=128)
-                diffP = np.dot(F1[alpha], PSDP3[alpha]) - np.dot(F1[alpha], PSDP4[alpha])
-                average = np.average([diffFp, diffO, diffT, diffP])
-                happy.append(average)
-#                print "DIFFFP ", diffFp
-#                print "diffO ", diffO
-#                print "diffT: ", diffT
-#                print "diffP: ", diffP
+            if valences[trial] >= 6 and valences[trial] <= 9:
+                selectedChannels = [centeredData[trial][i] for i in channelSelect]
+              
+                psdDiff = []
+      
+                for i in range(nums_chunk):
+                    #calculate psd for each chunk
+                    F1, PSDfp1 = signal.welch(selectedChannels[0][i*chunk : (i+1)*chunk], fs=128)
+                    F1, PSDfp2 = signal.welch(selectedChannels[1][i*chunk : (i+1)*chunk], fs=128)
+                    
+                    alpha = ((F1 >= 8) & (F1 <= 12))
+#                    if trial == 1:
+#                        plt.figure(i)
+#                        plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
+#                        plt.plot(F1[alpha], PSDfp2[alpha], 'b', label="Fp2")
+#                        plt.show()
+                        
+                    # calculate the difference psd between the time interval with index i
+                    diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
+#                    psdDiff.append(diffFp)
+#                average = np.average(psdDiff)
+                    newData.append(diffFp)
+                    emotion.append("Happy")
+    #                print np.array(PSD2[alpha]).shape
                 
             if valences[trial] >=1 and valences[trial] <=3:
-                eightChannels = [centeredData[trial][i] for i in channelSelect]
-                eightChannels = [centeredData[trial][i] for i in channelSelect]
+                selectedChannels = [centeredData[trial][i] for i in channelSelect]
+                psdDiff = []
+      
+                for i in range(nums_chunk):
+                    #calculate psd for each chunk
+                    F1, PSDfp1 = signal.welch(selectedChannels[0][i*chunk : (i+1)*chunk], fs=128)
+                    F1, PSDfp2 = signal.welch(selectedChannels[1][i*chunk : (i+1)*chunk], fs=128)
+
+                    alpha = ((F1 >= 8) & (F1 <= 12))
+#                    if trial == 1:
+#                        plt.figure(i)
+#                        plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
+#                        plt.plot(F1[alpha], PSDfp2[alpha], 'b', label="Fp2")
+#                        plt.show()
+                        
+                    # calculate the difference psd between the time interval with index i
+                    diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
+                    newData.append(diffFp)
+#                average = np.average(psdDiff)
+#                newData.append(average)
+                    emotion.append("Sad")
                 
-                F1, PSDfp1 = signal.welch(eightChannels[0], fs=128)
-                F1, PSDfp2 = signal.welch(eightChannels[1], fs=128)
-                alpha = ((F1 >= 8) & (F1 <= 12))
-#                print np.array(PSD2[alpha]).shape
-                diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
-                F1, PSDO1 = signal.welch(eightChannels[2], fs=128)
-                F1, PSDO2 = signal.welch(eightChannels[3], fs=128)
-                diffO = np.dot(F1[alpha], PSDO1[alpha]) - np.dot(F1[alpha], PSDO2[alpha])
-                F1, PSDT7 = signal.welch(eightChannels[4], fs=128)
-                F1, PSDT8 = signal.welch(eightChannels[5], fs=128)
-                diffT = np.dot(F1[alpha], PSDT7[alpha]) - np.dot(F1[alpha], PSDT8[alpha])
-                F1, PSDP3 = signal.welch(eightChannels[6], fs=128)
-                F1, PSDP4 = signal.welch(eightChannels[7], fs=128)
-                diffP = np.dot(F1[alpha], PSDP3[alpha]) - np.dot(F1[alpha], PSDP4[alpha])
-                average = np.average([diffFp, diffO, diffT, diffP])
-                sad.append(average)
+                
+        
+#                F1, PSDO1 = signal.welch(selectedChannels[2], fs=128)
+#                F1, PSDO2 = signal.welch(selectedChannels[3], fs=128)
+#                diffO = np.dot(F1[alpha], PSDO1[alpha]) - np.dot(F1[alpha], PSDO2[alpha])
+#                F1, PSDT7 = signal.welch(selectedChannels[4], fs=128)
+#                F1, PSDT8 = signal.welch(selectedChannels[5], fs=128)
+#                diffT = np.dot(F1[alpha], PSDT7[alpha]) - np.dot(F1[alpha], PSDT8[alpha])
+#                F1, PSDP3 = signal.welch(selectedChannels[6], fs=128)
+#                F1, PSDP4 = signal.welch(selectedChannels[7], fs=128)
+#                diffP = np.dot(F1[alpha], PSDP3[alpha]) - np.dot(F1[alpha], PSDP4[alpha])
+#                average = np.average([diffFp, diffO, diffT, diffP])
+#                sad.append(average)
          
-        newData.append(np.mean(happy)) 
-        emotion.append("happy")
-        newData.append(np.mean(sad))
-        emotion.append("sad")
 
 #construct panda data framework
 df = pd.DataFrame({"PSD-Asymetric": np.array(newData),
                    "emotion": emotion})
-
-
-#draw box and whisker
+print np.array(newData).shape
+print np.array(emotion).shape
+#
+##draw box and whisker
 sns.set(style="whitegrid")
+
+ax = sns.boxplot(x="emotion", y="PSD-Asymetric", data=df)   
  
-ax = sns.boxplot(x="emotion", y="PSD-Asymetric", data=df)      
         
 #        centeredVectors = zip(list(centeredData), binaryLabel)
 #        print np.array(centeredVectors).shape
