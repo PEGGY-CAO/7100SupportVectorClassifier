@@ -11,7 +11,7 @@ import matplotlib.gridspec as gridspec
 from scipy import signal
 import seaborn as sns
 import pandas as pd
-
+import itertools
 
 #first, read in the pre-processed data from a folder containing the DEAP .dat files.
 print("Loading EEG files")
@@ -49,6 +49,8 @@ for filename in filenames:
 
 newData = []
 emotion = []
+allvalences = []
+
 for filename in filenames:
     with open("DEAP_data/" + filename, 'rb') as f:
     
@@ -83,66 +85,96 @@ for filename in filenames:
         newLable = array["labels"]
         # get valence
         valences = [newLable[i][0] for i in range(40)]
+        allvalences.append(np.around(valences))
+        
+        
         happy =[]
         sad = []
         
         #select 8 matching channels: Fp1, Fp2, O1, O2, T7, T8, P3, P4
         # channelSelect = [0, 16, 13, 31, 7, 25, 10, 28]
         # Fp1, Fp2
-        channelSelect = [10, 28]
+        channelSelect = [13, 31]
         
         #select motions with happy and unhappy
         for trial in range(40):
             chunk = 128 * 3
             nums_chunk = 7680 / chunk
+            if trial == 1:
             
-            if valences[trial] >= 6 and valences[trial] <= 9:
-                selectedChannels = [centeredData[trial][i] for i in channelSelect]
-              
-                psdDiff = []
-      
-                for i in range(nums_chunk):
-                    #calculate psd for each chunk
-                    F1, PSDfp1 = signal.welch(selectedChannels[0][i*chunk : (i+1)*chunk], fs=128)
-                    F1, PSDfp2 = signal.welch(selectedChannels[1][i*chunk : (i+1)*chunk], fs=128)
+                if valences[trial] >= 6 and valences[trial] <= 9:
+                    selectedChannels = [centeredData[trial][i] for i in channelSelect]
+                  
+                    psdDiff = []
                     
-                    alpha = ((F1 >= 8) & (F1 <= 12))
-#                    if trial == 1:
-#                        plt.figure(i)
-#                        plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
-#                        plt.plot(F1[alpha], PSDfp2[alpha], 'b', label="Fp2")
-#                        plt.show()
-                        
-                    # calculate the difference psd between the time interval with index i
-                    diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
-#                    psdDiff.append(diffFp)
-#                average = np.average(psdDiff)
-                    newData.append(diffFp)
-                    emotion.append("Happy")
-    #                print np.array(PSD2[alpha]).shape
-                
-            if valences[trial] >=1 and valences[trial] <=3:
-                selectedChannels = [centeredData[trial][i] for i in channelSelect]
-                psdDiff = []
-      
-                for i in range(nums_chunk):
-                    #calculate psd for each chunk
-                    F1, PSDfp1 = signal.welch(selectedChannels[0][i*chunk : (i+1)*chunk], fs=128)
-                    F1, PSDfp2 = signal.welch(selectedChannels[1][i*chunk : (i+1)*chunk], fs=128)
-
-                    alpha = ((F1 >= 8) & (F1 <= 12))
-#                    if trial == 1:
-#                        plt.figure(i)
-#                        plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
-#                        plt.plot(F1[alpha], PSDfp2[alpha], 'b', label="Fp2")
-#                        plt.show()
-                        
-                    # calculate the difference psd between the time interval with index i
-                    diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
-                    newData.append(diffFp)
-#                average = np.average(psdDiff)
-#                newData.append(average)
-                    emotion.append("Sad")
+                    #scipy spectrogram F-t
+                    f1, t1, Sxx1 = signal.spectrogram(selectedChannels[0], 128)
+                    f2, t2, Sxx2 = signal.spectrogram(selectedChannels[1], 128)
+                    
+                    
+                    plt.figure(trial)
+                    title = 'Trial: '+str(trial+1)
+                    
+                    fig, axs = plt.subplots(2, 1, sharex='col')
+                    fig.suptitle(title)
+                    
+                    axs[0].pcolormesh(t1, f1, Sxx1)
+                    axs[0].set_xlabel('Time [sec]')
+                    axs[0].set_ylabel('Frequency [Hz]')
+                    
+                    axs[0].set_title("O1")
+                    
+                    
+                    axs[1].pcolormesh(t2, f2, Sxx2)
+                    axs[1].set_ylabel('Frequency [Hz]')
+                    axs[1].set_xlabel('Time [sec]')
+                    axs[1].set_title("O2")
+                    
+                    
+                    plt.show()
+          
+    #                for i in range(nums_chunk):
+    #                    #calculate psd for each chunk
+    #                    F1, PSDfp1 = signal.welch(selectedChannels[0][i*chunk : (i+1)*chunk], fs=128)
+    #                    F1, PSDfp2 = signal.welch(selectedChannels[1][i*chunk : (i+1)*chunk], fs=128)
+    #                    
+    #                    alpha = ((F1 >= 8) & (F1 <= 12))
+    ##                    if trial == 1:
+    ##                        plt.figure(i)
+    ##                        plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
+    ##                        plt.plot(F1[alpha], PSDfp2[alpha], 'b', label="Fp2")
+    ##                        plt.show()
+    #                        
+    #                    # calculate the difference psd between the time interval with index i
+    #                    diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
+    ##                    psdDiff.append(diffFp)
+    ##                average = np.average(psdDiff)
+    #                    newData.append(diffFp)
+    #                    emotion.append("Happy")
+        #                print np.array(PSD2[alpha]).shape
+                    
+                if valences[trial] >=1 and valences[trial] <=3:
+                    selectedChannels = [centeredData[trial][i] for i in channelSelect]
+                    psdDiff = []
+          
+                    for i in range(nums_chunk):
+                        #calculate psd for each chunk
+                        F1, PSDfp1 = signal.welch(selectedChannels[0][i*chunk : (i+1)*chunk], fs=128)
+                        F1, PSDfp2 = signal.welch(selectedChannels[1][i*chunk : (i+1)*chunk], fs=128)
+    
+                        alpha = ((F1 >= 8) & (F1 <= 12))
+    #                    if trial == 1:
+    #                        plt.figure(i)
+    #                        plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
+    #                        plt.plot(F1[alpha], PSDfp2[alpha], 'b', label="Fp2")
+    #                        plt.show()
+                            
+                        # calculate the difference psd between the time interval with index i
+                        diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
+                        newData.append(diffFp)
+    #                average = np.average(psdDiff)
+    #                newData.append(average)
+                        emotion.append("Sad")
                 
                 
         
@@ -159,17 +191,33 @@ for filename in filenames:
 #                sad.append(average)
          
 
+print np.array(allvalences).shape
+allvalences = list(itertools.chain.from_iterable(allvalences))  
+                 
+plt.figure()
+plt.hist(allvalences, bins=np.arange(11), density=True)
+plt.xticks(np.arange(1, 9, 1))
+plt.show()
+
+
 #construct panda data framework
 df = pd.DataFrame({"PSD-Asymetric": np.array(newData),
                    "emotion": emotion})
 print np.array(newData).shape
 print np.array(emotion).shape
-#
+
+plt.figure()
 ##draw box and whisker
 sns.set(style="whitegrid")
 
 ax = sns.boxplot(x="emotion", y="PSD-Asymetric", data=df)   
- 
+plt.show()
+
+
+
+
+
+
         
 #        centeredVectors = zip(list(centeredData), binaryLabel)
 #        print np.array(centeredVectors).shape
