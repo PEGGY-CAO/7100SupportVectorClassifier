@@ -12,6 +12,23 @@ from scipy import signal
 import seaborn as sns
 import pandas as pd
 import itertools
+from sklearn.svm import LinearSVC
+
+from scipy.signal import butter, lfilter
+
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
+
 
 #first, read in the pre-processed data from a folder containing the DEAP .dat files.
 print("Loading EEG files")
@@ -71,12 +88,20 @@ for filename in filenames:
         baselineIndices = 128 * 3
         baselinePart = [np.array(dataArray[i][:, :baselineIndices]).mean(axis=1) for i in range(40)]
         
-        # construct the centeredData with subtraction of the average
+        # construct the centeredData with subtraction of the average, normalized and bandpassfilter
+        lowcut = 8
+        highcut = 40
+        fs = 128
+        
         centeredData = []
         for i in range(40):
             eachTrial = []
             for j in range(32):
-                eachTrial.append(dataArray[i][j][baselineIndices:] - baselinePart[i][j])
+#                print max(dataArray[i][j])
+                preproc = (dataArray[i][j][baselineIndices:] - baselinePart[i][j])/max(dataArray[i][j][baselineIndices:])
+                
+                y = butter_bandpass_filter(preproc, lowcut, highcut, fs, order=6)
+                eachTrial.append(y)
             centeredData.append(eachTrial)
         # print np.array(centeredData).shape   
         # now centeredData's shape: 40*32*7680
@@ -91,47 +116,71 @@ for filename in filenames:
         happy =[]
         sad = []
         
-        #select 8 matching channels: Fp1, Fp2, O1, O2, T7, T8, P3, P4
-        # channelSelect = [0, 16, 13, 31, 7, 25, 10, 28]
+        #select 8 matching channels: Fp1, Fp2, O1, O2, T7, T8, P3, P4, P7, P8
+        # channelSelect = [0, 16, 13, 31, 7, 25, 10, 28, 11, 29]
         # Fp1, Fp2
-        channelSelect = [13, 31]
+        channelSelect = [13, 31, 10, 28, 7, 25, 11, 29]
         
         #select motions with happy and unhappy
         for trial in range(40):
-            chunk = 128 * 3
-            nums_chunk = 7680 / chunk
-            if trial == 1:
             
-                if valences[trial] >= 6 and valences[trial] <= 9:
-                    selectedChannels = [centeredData[trial][i] for i in channelSelect]
-                  
-                    psdDiff = []
+            label = valences[trial]
+            
+            if (label >= 6 and label <= 9) or (label >=1 and label <=3.5): 
+                selectedChannels = [centeredData[trial][i] for i in channelSelect]
+#                print np.array(selectedChannels).shape
+                spec=[]
+                
+                #scipy spectrogram F-t
+                for sig in selectedChannels:
                     
-                    #scipy spectrogram F-t
-                    f1, t1, Sxx1 = signal.spectrogram(selectedChannels[0], 128)
-                    f2, t2, Sxx2 = signal.spectrogram(selectedChannels[1], 128)
+                    f1, t1, cwtmatr1 = signal.spectrogram(sig, 128)
+#                    print f1.shape, t1
+#                    widths = np.arange(1, 31)
+                    alpha = ((f1 >= 8) & (f1 <= 40))
+#                    cwtmatr1 = signal.cwt(sig, signal.ricker, widths)
+#                    print np.array(Sxx1).shape: 129*34
+                    #I want to select the bandwith in range 13-30Hz
+                    beta = ((f1 >= 13) & (f1 <= 30))
+                    gamma = ((f1 >= 30) & (f1 <= 100))
+                    spec.append(cwtmatr1[alpha])
                     
-                    
-                    plt.figure(trial)
-                    title = 'Trial: '+str(trial+1)
-                    
-                    fig, axs = plt.subplots(2, 1, sharex='col')
-                    fig.suptitle(title)
-                    
-                    axs[0].pcolormesh(t1, f1, Sxx1)
-                    axs[0].set_xlabel('Time [sec]')
-                    axs[0].set_ylabel('Frequency [Hz]')
-                    
-                    axs[0].set_title("O1")
-                    
-                    
-                    axs[1].pcolormesh(t2, f2, Sxx2)
-                    axs[1].set_ylabel('Frequency [Hz]')
-                    axs[1].set_xlabel('Time [sec]')
-                    axs[1].set_title("O2")
-                    
-                    
-                    plt.show()
+                #    
+                if random.uniform(0, 1) < 0.2:
+                    x_test.append(((spec[0]+spec[2]-spec[1]-spec[3]+spec[4]-spec[5]+spec[6]-spec[7])/4).flatten())
+#                    x_test.append(spec)
+                    if (label >= 6 and label <= 9):
+                        y_test.append(1)
+                    else:
+                        y_test.append(0)
+                else:
+                    x_train.append(((spec[0]+spec[2]-spec[1]-spec[3]+spec[4]-spec[5]+spec[6]-spec[7])/4).flatten())
+#                    x_train.append(spec)
+                    if (label >= 6 and label <= 9):
+                        y_train.append(1)
+                    else:
+                        y_train.append(0)
+                
+                
+                
+#                title = 'Trial: '+str(trial+1)
+                
+#                fig, axs = plt.subplots(2, 1, sharex='col')
+#                fig.suptitle(title)
+#                
+#                axs[0].pcolormesh(t1, f1, Sxx1)
+#                axs[0].set_xlabel('Time [sec]')
+#                axs[0].set_ylabel('Frequency [Hz]')                   
+#                axs[0].set_title("O1")
+#                
+#                
+#                axs[1].pcolormesh(t2, f2, Sxx2)
+#                axs[1].set_ylabel('Frequency [Hz]')
+#                axs[1].set_xlabel('Time [sec]')
+#                axs[1].set_title("O2")
+                
+                
+#                plt.show()
           
     #                for i in range(nums_chunk):
     #                    #calculate psd for each chunk
@@ -153,28 +202,45 @@ for filename in filenames:
     #                    emotion.append("Happy")
         #                print np.array(PSD2[alpha]).shape
                     
-                if valences[trial] >=1 and valences[trial] <=3:
-                    selectedChannels = [centeredData[trial][i] for i in channelSelect]
-                    psdDiff = []
-          
-                    for i in range(nums_chunk):
-                        #calculate psd for each chunk
-                        F1, PSDfp1 = signal.welch(selectedChannels[0][i*chunk : (i+1)*chunk], fs=128)
-                        F1, PSDfp2 = signal.welch(selectedChannels[1][i*chunk : (i+1)*chunk], fs=128)
-    
-                        alpha = ((F1 >= 8) & (F1 <= 12))
-    #                    if trial == 1:
-    #                        plt.figure(i)
-    #                        plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
-    #                        plt.plot(F1[alpha], PSDfp2[alpha], 'b', label="Fp2")
-    #                        plt.show()
-                            
-                        # calculate the difference psd between the time interval with index i
-                        diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
-                        newData.append(diffFp)
-    #                average = np.average(psdDiff)
-    #                newData.append(average)
-                        emotion.append("Sad")
+#            if valences[trial] >=1 and valences[trial] <=3.5:
+#                selectedChannels = [centeredData[trial][i] for i in channelSelect]
+#                
+#                #continuous wavelet transform
+##                    plt.figure()
+#                fig, axs = plt.subplots(2, 1, sharex='col')
+#                widths = np.arange(1, 31)
+#                
+#                cwtmatr1 = signal.cwt(selectedChannels[0], signal.ricker, widths)
+#                print cwtmatr1.shape
+#                axs[0].imshow(cwtmatr1, extent=[-1,7680,1,40],cmap='PRGn', aspect='auto', vmax=abs(cwtmatr1).max(), vmin=-abs(cwtmatr1).max())
+#                cwtmatr2 = signal.cwt(selectedChannels[1], signal.ricker, widths)
+#                axs[1].imshow(cwtmatr2, extent=[-1,7680,1,40],cmap='PRGn', aspect='auto', vmax=abs(cwtmatr2).max(), vmin=-abs(cwtmatr2).max())
+#                plt.show()
+                    
+                    
+                    
+                    
+                    
+#                    psdDiff = []
+#          
+#                    for i in range(nums_chunk):
+#                        #calculate psd for each chunk
+#                        F1, PSDfp1 = signal.welch(selectedChannels[0][i*chunk : (i+1)*chunk], fs=128)
+#                        F1, PSDfp2 = signal.welch(selectedChannels[1][i*chunk : (i+1)*chunk], fs=128)
+#    
+#                        alpha = ((F1 >= 8) & (F1 <= 12))
+#    #                    if trial == 1:
+#    #                        plt.figure(i)
+#    #                        plt.plot(F1[alpha], PSDfp1[alpha], 'r', label="Fp1")
+#    #                        plt.plot(F1[alpha], PSDfp2[alpha], 'b', label="Fp2")
+#    #                        plt.show()
+#                            
+#                        # calculate the difference psd between the time interval with index i
+#                        diffFp = np.dot(F1[alpha], PSDfp1[alpha]) - np.dot(F1[alpha], PSDfp2[alpha])
+#                        newData.append(diffFp)
+#    #                average = np.average(psdDiff)
+#    #                newData.append(average)
+#                        emotion.append("Sad")
                 
                 
         
@@ -189,29 +255,41 @@ for filename in filenames:
 #                diffP = np.dot(F1[alpha], PSDP3[alpha]) - np.dot(F1[alpha], PSDP4[alpha])
 #                average = np.average([diffFp, diffO, diffT, diffP])
 #                sad.append(average)
-         
+print np.array(x_train).shape 
+cmatr = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
 
-print np.array(allvalences).shape
-allvalences = list(itertools.chain.from_iterable(allvalences))  
-                 
-plt.figure()
-plt.hist(allvalences, bins=np.arange(11), density=True)
-plt.xticks(np.arange(1, 9, 1))
-plt.show()
+      
+clf = LinearSVC(random_state=0, tol=1e-5,C=0.1,max_iter=200)
+clf.fit(x_train, y_train)
+#
+dataaaa = x_test[0]
+label_t = y_test[0]
+#
+print "acturally", y_test
+#print clf.predict(x_test)
+print clf.score(x_test, y_test)
+#print np.array(allvalences).shape
+#allvalences = list(itertools.chain.from_iterable(allvalences))  
+#                 
+#plt.figure()
+#plt.hist(allvalences, bins=np.arange(11), density=True)
+#plt.xticks(np.arange(1, 10, 1))
+#plt.title('Distribution of Valence in range 1 to 9')
+#plt.show()
+#
+#
+##construct panda data framework
+#df = pd.DataFrame({"PSD-Asymetric": np.array(newData),
+#                   "emotion": emotion})
+#print np.array(newData).shape
+#print np.array(emotion).shape
 
-
-#construct panda data framework
-df = pd.DataFrame({"PSD-Asymetric": np.array(newData),
-                   "emotion": emotion})
-print np.array(newData).shape
-print np.array(emotion).shape
-
-plt.figure()
+#plt.figure()
 ##draw box and whisker
-sns.set(style="whitegrid")
-
-ax = sns.boxplot(x="emotion", y="PSD-Asymetric", data=df)   
-plt.show()
+#sns.set(style="whitegrid")
+#
+#ax = sns.boxplot(x="emotion", y="PSD-Asymetric", data=df)   
+#plt.show()
 
 
 
